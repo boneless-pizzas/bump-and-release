@@ -3,8 +3,6 @@ name: Bump Version and Release
 on:
   workflow_call:
     secrets:
-      GITHUB_TOKEN:
-        required: true
       BOT_TOKEN:
         required: true
 
