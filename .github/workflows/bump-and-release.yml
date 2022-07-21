@@ -1,0 +1,56 @@
+name: Bump Version and Release
+
+on:
+  workflow_call:
+    secrets:
+      GITHUB_TOKEN:
+        required: true
+      BOT_TOKEN:
+        required: true
+
+jobs:
+  bump_and_release:
+    name: Bump and Release
+    runs-on: ubuntu-latest
+    if: ${{ github.event.pull_request.merged }}
+    env:
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - name: Checkout Repo
+        uses: 'actions/checkout@v3'
+        with:
+          persist-credentials: true
+          ref: ${{ github.ref }}
+          token: ${{ secrets.BOT_TOKEN }}
+
+      - name: Set Author
+        run: |
+          git config --local user.name 'internal-toolsbot'
+          git config --local user.email 'internal-toolsbot@users.noreply.github.com'
+      - name: Bump Version
+        id: bump_version
+        uses: 'dtgreene/keyword-version-bump@main'
+        with:
+          search-target: ${{ github.event.pull_request.title }}
+          configuration: '.github/workflows/bump-version.config.json'
+
+      - name: Set Tag Name
+        id: set_tag_name
+        run: echo "::set-output name=tag_name::v${{ steps.bump_version.outputs.bumped_version }}"
+
+      - name: Create Tag
+        run: |
+          git tag ${{ steps.set_tag_name.outputs.tag_name }}
+          git push origin ${{ steps.set_tag_name.outputs.tag_name }}
+      - name: Build Changelog
+        id: release_changelog
+        uses: mikepenz/release-changelog-builder-action@v2.9.0
+        with:
+          configuration: '.github/workflows/release-notes-config.json'
+
+      - name: Create Release
+        uses: actions/create-release@v1
+        with:
+          tag_name: ${{ steps.set_tag_name.outputs.tag_name }}
+          release_name: ${{ steps.set_tag_name.outputs.tag_name }}
+          body: ${{steps.release_changelog.outputs.changelog}}
